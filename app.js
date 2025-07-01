@@ -20,6 +20,14 @@ document.addEventListener('DOMContentLoaded', function () {
     const exportBtn = document.getElementById('export-tasks');
     const importBtn = document.getElementById('import-tasks');
     const importFile = document.getElementById('import-file');
+    const addTagsBtn = document.getElementById('add-tags-btn');
+    const tagsInputContainer = document.getElementById('tags-input-container');
+    const tagsInput = document.getElementById('tags-input');
+    const bulkActionsBtn = document.getElementById('bulk-actions-btn');
+    const bulkActionsPanel = document.getElementById('bulk-actions-panel');
+    const fabBtn = document.getElementById('fab-btn');
+    const quickAddModal = document.getElementById('quick-add-modal');
+    const shortcutsModal = document.getElementById('shortcuts-modal');
 
     const allTasksBtn = document.getElementById('all-tasks');
     const activeTasksBtn = document.getElementById('active-tasks');
@@ -38,6 +46,17 @@ document.addEventListener('DOMContentLoaded', function () {
     let currentYear = currentDate.getFullYear();
     let searchTerm = '';
     let sortBy = 'created';
+    let bulkMode = false;
+    let selectedTasks = new Set();
+    let draggedTaskId = null;
+    
+    // Timer variables
+    let timerInterval = null;
+    let timerSeconds = 25 * 60; // 25 minutes
+    let isTimerRunning = false;
+    let isBreakTime = false;
+    let sessionCount = parseInt(localStorage.getItem('sessionCount')) || 0;
+    let dailySessions = parseInt(localStorage.getItem('dailySessions_' + new Date().toDateString())) || 0;
 
     // Dark mode functionality
     const isDarkMode = localStorage.getItem('darkMode') === 'true';
@@ -96,8 +115,21 @@ document.addEventListener('DOMContentLoaded', function () {
                 
                 taskElement.className = `task-item bg-white p-3 rounded-md border border-gray-200 flex items-center justify-between ${
                     task.completed ? 'completed opacity-75' : ''
-                } priority-${task.priority || 'normal'} ${isOverdue ? 'overdue' : ''}`;
+                } priority-${task.priority || 'normal'} ${isOverdue ? 'overdue' : ''} ${
+                    selectedTasks.has(task.id) ? 'selected' : ''
+                }`;
                 taskElement.dataset.id = task.id;
+                taskElement.draggable = true;
+
+                taskElement.addEventListener('dragstart', (e) => {
+                    draggedTaskId = task.id;
+                    e.currentTarget.classList.add('dragging');
+                });
+
+                taskElement.addEventListener('dragend', (e) => {
+                    e.currentTarget.classList.remove('dragging');
+                    document.querySelectorAll('.drag-over').forEach(el => el.classList.remove('drag-over'));
+                });
 
                 const categoryBadge = task.category ? 
                     `<span class="category-badge category-${task.category} mr-2">${getCategoryLabel(task.category)}</span>` : '';
@@ -105,8 +137,15 @@ document.addEventListener('DOMContentLoaded', function () {
                 const dueDateBadge = task.dueDate ? 
                     `<span class="text-xs text-gray-500 mr-2">${formatDate(task.dueDate)}</span>` : '';
 
+                const tagsBadges = task.tags && task.tags.length > 0 ? 
+                    task.tags.map(tag => `<span class="tag">${tag}</span>`).join('') : '';
+
+                const bulkCheckbox = bulkMode ? 
+                    `<input type="checkbox" class="task-checkbox mr-2" ${selectedTasks.has(task.id) ? 'checked' : ''}>` : '';
+
                 taskElement.innerHTML = `
                     <div class="flex items-center">
+                        ${bulkCheckbox}
                         <button class="complete-btn mr-3 w-6 h-6 rounded-full border-2 ${task.completed ? 'border-red-400 bg-red-400 text-white' : 'border-gray-300'} flex items-center justify-center">
                             ${task.completed ? '<i class="fas fa-check text-xs"></i>' : ''}
                         </button>
@@ -115,16 +154,37 @@ document.addEventListener('DOMContentLoaded', function () {
                             <div class="flex items-center mt-1">
                                 ${categoryBadge}
                                 ${dueDateBadge}
-                                ${task.priority === 'high' ? '<i class="fas fa-exclamation text-red-500 text-xs"></i>' : ''}
+                                ${task.priority === 'high' ? '<i class="fas fa-exclamation text-red-500 text-xs mr-2"></i>' : ''}
+                                ${tagsBadges}
                             </div>
+                            ${task.subtasks && task.subtasks.length > 0 ? 
+                                `<div class="text-xs text-gray-500 mt-1">${task.subtasks.filter(st => st.completed).length}/${task.subtasks.length} サブタスク完了</div>` : ''
+                            }
                         </div>
                     </div>
                     <div class="flex items-center">
+                        <button class="add-subtask-btn text-gray-400 hover:text-blue-400 mr-2" title="サブタスク追加"><i class="fas fa-plus text-xs"></i></button>
+                        <button class="start-timer-btn text-gray-400 hover:text-green-400 mr-2" title="タイマー開始"><i class="fas fa-play text-xs"></i></button>
                         <button class="edit-btn text-gray-400 hover:text-red-400 mr-2"><i class="fas fa-pencil-alt"></i></button>
                         <button class="delete-btn text-gray-400 hover:text-red-400"><i class="fas fa-trash-alt"></i></button>
                     </div>
                 `;
                 taskList.appendChild(taskElement);
+
+                // Add bulk selection event
+                const checkbox = taskElement.querySelector('.task-checkbox');
+                if (checkbox) {
+                    checkbox.addEventListener('change', (e) => {
+                        e.stopPropagation();
+                        if (e.target.checked) {
+                            selectedTasks.add(task.id);
+                            taskElement.classList.add('selected');
+                        } else {
+                            selectedTasks.delete(task.id);
+                            taskElement.classList.remove('selected');
+                        }
+                    });
+                }
             });
         }
 
@@ -162,7 +222,10 @@ document.addEventListener('DOMContentLoaded', function () {
             createdAt: new Date().toISOString(),
             dueDate: dueDateInput.value || null,
             priority: priorityInput.value || 'normal',
-            category: categoryInput.value || 'general'
+            category: categoryInput.value || 'general',
+            tags: tagsInput.value ? tagsInput.value.split(',').map(tag => tag.trim()).filter(tag => tag) : [],
+            subtasks: [],
+            timeSpent: 0
         };
 
         tasks.push(newTask);
@@ -172,6 +235,8 @@ document.addEventListener('DOMContentLoaded', function () {
         dueDateInput.value = '';
         priorityInput.value = 'normal';
         categoryInput.value = 'general';
+        tagsInput.value = '';
+        tagsInputContainer.classList.add('hidden');
         
         renderTasks();
         showNotification('タスクを追加しました');
@@ -489,6 +554,247 @@ document.addEventListener('DOMContentLoaded', function () {
         reader.readAsText(file);
         e.target.value = '';
     });
+
+    // Keyboard shortcuts
+    document.addEventListener('keydown', (e) => {
+        if (e.target.tagName === 'INPUT' && e.target.type === 'text') return;
+        
+        switch (e.key.toLowerCase()) {
+            case 'n':
+                if (!e.ctrlKey) {
+                    fabBtn.click();
+                    e.preventDefault();
+                }
+                break;
+            case 'f':
+                if (e.ctrlKey) {
+                    searchInput.focus();
+                    e.preventDefault();
+                }
+                break;
+            case 'a':
+                if (e.ctrlKey) {
+                    document.getElementById('select-all-tasks').click();
+                    e.preventDefault();
+                }
+                break;
+            case 'd':
+                if (e.ctrlKey) {
+                    clearCompleted.click();
+                    e.preventDefault();
+                }
+                break;
+            case 'm':
+                if (e.ctrlKey) {
+                    darkModeToggle.click();
+                    e.preventDefault();
+                }
+                break;
+            case 'e':
+                if (e.ctrlKey) {
+                    exportBtn.click();
+                    e.preventDefault();
+                }
+                break;
+            case '?':
+                shortcutsModal.classList.remove('hidden');
+                e.preventDefault();
+                break;
+            case 'escape':
+                quickAddModal.classList.add('hidden');
+                shortcutsModal.classList.add('hidden');
+                break;
+        }
+    });
+
+    // Quick Add Modal
+    fabBtn.addEventListener('click', () => {
+        quickAddModal.classList.remove('hidden');
+        document.getElementById('quick-task-input').focus();
+    });
+
+    document.getElementById('close-modal').addEventListener('click', () => {
+        quickAddModal.classList.add('hidden');
+    });
+
+    document.getElementById('cancel-quick-add').addEventListener('click', () => {
+        quickAddModal.classList.add('hidden');
+    });
+
+    document.getElementById('close-shortcuts').addEventListener('click', () => {
+        shortcutsModal.classList.add('hidden');
+    });
+
+    // Quick add form submission
+    document.getElementById('quick-add-form').addEventListener('submit', (e) => {
+        e.preventDefault();
+        const text = document.getElementById('quick-task-input').value.trim();
+        if (!text) return;
+
+        const newTask = {
+            id: Date.now(),
+            text,
+            completed: false,
+            createdAt: new Date().toISOString(),
+            dueDate: document.getElementById('quick-due-date').value || null,
+            priority: document.getElementById('quick-priority').value || 'normal',
+            category: document.getElementById('quick-category').value || 'general',
+            tags: [],
+            subtasks: [],
+            timeSpent: 0
+        };
+
+        tasks.push(newTask);
+        localStorage.setItem('tasks', JSON.stringify(tasks));
+        renderTasks();
+        showNotification('タスクを追加しました');
+        
+        // Reset form
+        document.getElementById('quick-add-form').reset();
+        quickAddModal.classList.add('hidden');
+    });
+
+    // Tags functionality
+    addTagsBtn.addEventListener('click', () => {
+        tagsInputContainer.classList.toggle('hidden');
+        if (!tagsInputContainer.classList.contains('hidden')) {
+            tagsInput.focus();
+        }
+    });
+
+    // Bulk actions
+    bulkActionsBtn.addEventListener('click', () => {
+        bulkMode = !bulkMode;
+        bulkActionsPanel.classList.toggle('hidden');
+        document.body.classList.toggle('bulk-mode', bulkMode);
+        
+        if (!bulkMode) {
+            selectedTasks.clear();
+            document.querySelectorAll('.task-item').forEach(item => {
+                item.classList.remove('selected');
+            });
+        }
+        renderTasks();
+    });
+
+    document.getElementById('close-bulk-actions').addEventListener('click', () => {
+        bulkMode = false;
+        bulkActionsPanel.classList.add('hidden');
+        document.body.classList.remove('bulk-mode');
+        selectedTasks.clear();
+        renderTasks();
+    });
+
+    // Timer functionality
+    function updateTimerDisplay() {
+        const minutes = Math.floor(timerSeconds / 60);
+        const seconds = timerSeconds % 60;
+        document.getElementById('timer-display').textContent = 
+            `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+        
+        const totalSeconds = isBreakTime ? 5 * 60 : 25 * 60;
+        const progress = ((totalSeconds - timerSeconds) / totalSeconds) * 100;
+        document.getElementById('timer-progress').style.width = `${progress}%`;
+    }
+
+    document.getElementById('start-timer').addEventListener('click', () => {
+        if (!isTimerRunning) {
+            isTimerRunning = true;
+            document.getElementById('timer-display').classList.add('timer-active');
+            
+            timerInterval = setInterval(() => {
+                timerSeconds--;
+                updateTimerDisplay();
+                
+                if (timerSeconds <= 0) {
+                    // Timer finished
+                    isTimerRunning = false;
+                    clearInterval(timerInterval);
+                    document.getElementById('timer-display').classList.remove('timer-active');
+                    
+                    if (!isBreakTime) {
+                        // Work session completed
+                        sessionCount++;
+                        dailySessions++;
+                        localStorage.setItem('sessionCount', sessionCount);
+                        localStorage.setItem('dailySessions_' + new Date().toDateString(), dailySessions);
+                        
+                        document.getElementById('session-count').textContent = sessionCount;
+                        document.getElementById('daily-sessions').textContent = dailySessions;
+                        
+                        // Start break
+                        isBreakTime = true;
+                        timerSeconds = 5 * 60; // 5 minute break
+                        document.getElementById('timer-status').textContent = '休憩時間';
+                        showNotification('作業セッション完了！5分休憩してください。');
+                    } else {
+                        // Break completed
+                        isBreakTime = false;
+                        timerSeconds = 25 * 60;
+                        document.getElementById('timer-status').textContent = '作業時間';
+                        showNotification('休憩終了！新しい作業セッションを開始してください。');
+                    }
+                    updateTimerDisplay();
+                }
+            }, 1000);
+        }
+    });
+
+    document.getElementById('pause-timer').addEventListener('click', () => {
+        if (isTimerRunning) {
+            isTimerRunning = false;
+            clearInterval(timerInterval);
+            document.getElementById('timer-display').classList.remove('timer-active');
+        }
+    });
+
+    document.getElementById('reset-timer').addEventListener('click', () => {
+        isTimerRunning = false;
+        clearInterval(timerInterval);
+        document.getElementById('timer-display').classList.remove('timer-active');
+        timerSeconds = isBreakTime ? 5 * 60 : 25 * 60;
+        updateTimerDisplay();
+    });
+
+    // Initialize timer display
+    document.getElementById('session-count').textContent = sessionCount;
+    document.getElementById('daily-sessions').textContent = dailySessions;
+    updateTimerDisplay();
+
+    // Drag and Drop functionality
+    function allowDrop(ev) {
+        ev.preventDefault();
+        ev.currentTarget.classList.add('drag-over');
+    }
+
+    function drop(ev) {
+        ev.preventDefault();
+        ev.currentTarget.classList.remove('drag-over');
+        
+        if (draggedTaskId) {
+            const draggedIndex = tasks.findIndex(t => t.id === draggedTaskId);
+            const targetElement = ev.target.closest('.task-item');
+            
+            if (targetElement && draggedIndex !== -1) {
+                const targetId = parseInt(targetElement.dataset.id);
+                const targetIndex = tasks.findIndex(t => t.id === targetId);
+                
+                if (targetIndex !== -1) {
+                    // Reorder tasks
+                    const draggedTask = tasks.splice(draggedIndex, 1)[0];
+                    tasks.splice(targetIndex, 0, draggedTask);
+                    localStorage.setItem('tasks', JSON.stringify(tasks));
+                    renderTasks();
+                    showNotification('タスクの順序を変更しました');
+                }
+            }
+        }
+        draggedTaskId = null;
+    }
+
+    // Make drag and drop global functions
+    window.allowDrop = allowDrop;
+    window.drop = drop;
 
     renderTasks();
 });

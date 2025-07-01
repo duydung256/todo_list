@@ -107,6 +107,134 @@ body {
 .dark .category-health { background-color: #92400e; color: #fcd34d; }
 .dark .category-general { background-color: #374151; color: #d1d5db; }
 
+/* Drag and Drop */
+.task-item {
+    cursor: move;
+}
+
+.task-item.dragging {
+    opacity: 0.5;
+    transform: rotate(5deg);
+}
+
+.drag-over {
+    border: 2px dashed #ef4444 !important;
+    background-color: #fef2f2 !important;
+}
+
+/* Bulk selection */
+.task-item.selected {
+    background-color: #dbeafe !important;
+    border-color: #3b82f6 !important;
+}
+
+.task-checkbox {
+    opacity: 0;
+    transition: opacity 0.2s ease;
+}
+
+.bulk-mode .task-checkbox {
+    opacity: 1;
+}
+
+/* Tags */
+.tag {
+    background-color: #e5e7eb;
+    color: #374151;
+    font-size: 0.75rem;
+    padding: 2px 8px;
+    border-radius: 12px;
+    margin-right: 4px;
+    display: inline-block;
+}
+
+.dark .tag {
+    background-color: #374151;
+    color: #d1d5db;
+}
+
+/* Subtasks */
+.subtask-item {
+    margin-left: 20px;
+    padding: 8px;
+    background-color: #f9fafb;
+    border-left: 3px solid #e5e7eb;
+    border-radius: 0 4px 4px 0;
+}
+
+.dark .subtask-item {
+    background-color: #374151;
+    border-left-color: #4b5563;
+}
+
+/* Floating Action Button */
+#fab-btn {
+    box-shadow: 0 8px 16px rgba(0, 0, 0, 0.15);
+    animation: float 3s ease-in-out infinite;
+}
+
+#fab-btn:hover {
+    transform: scale(1.1);
+    box-shadow: 0 12px 24px rgba(0, 0, 0, 0.2);
+}
+
+@keyframes float {
+    0%, 100% { transform: translateY(0); }
+    50% { transform: translateY(-5px); }
+}
+
+/* Modal animations */
+.modal-enter {
+    animation: modalEnter 0.3s ease-out;
+}
+
+@keyframes modalEnter {
+    from { opacity: 0; transform: scale(0.9); }
+    to { opacity: 1; transform: scale(1); }
+}
+
+/* Timer styles */
+.timer-active {
+    animation: pulse 2s infinite;
+}
+
+@keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.8; }
+}
+
+/* Keyboard shortcuts */
+kbd {
+    font-family: monospace;
+    font-size: 0.875rem;
+}
+
+/* Custom scrollbar */
+::-webkit-scrollbar {
+    width: 6px;
+}
+
+::-webkit-scrollbar-track {
+    background: var(--bg-primary);
+}
+
+::-webkit-scrollbar-thumb {
+    background: #d1d5db;
+    border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+    background: #9ca3af;
+}
+
+.dark ::-webkit-scrollbar-thumb {
+    background: #4b5563;
+}
+
+.dark ::-webkit-scrollbar-thumb:hover {
+    background: #6b7280;
+}
+
 .completed {
     position: relative;
 }
