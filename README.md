@@ -285,21 +285,7 @@ in the Software without restriction...
 
 ## 👤 作者
 
-**Your Name**
-- 🌐 ウェブサイト: [yourwebsite.com](https://yourwebsite.com)
-- 🐙 GitHub: [@yourusername](https://github.com/yourusername)
-- 📧 メール: your.email@example.com
-- 💼 LinkedIn: [Your LinkedIn](https://linkedin.com/in/yourname)
-- 🐦 Twitter: [@yourusername](https://twitter.com/yourusername)
 
-## 📊 プロジェクト統計
-
-![GitHub stars](https://img.shields.io/github/stars/yourusername/japanese-todo-app)
-![GitHub forks](https://img.shields.io/github/forks/yourusername/japanese-todo-app)
-![GitHub issues](https://img.shields.io/github/issues/yourusername/japanese-todo-app)
-![GitHub license](https://img.shields.io/github/license/yourusername/japanese-todo-app)
-
----
 
 <div align="center">
 
